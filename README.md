@@ -10,7 +10,10 @@ Climate tech
 
 **Tech**
 
-Just HTML, CSS, and JavaScript — no frameworks, no build tools. It saves everything in the browser's local storage instead of using a real database, so it's a single file you can just open.
+Just HTML, CSS, and JavaScript — no frameworks, no build tools. It saves everything in the browser's local storage instead of using a real database, so it's a single file you can just open.## API
+
+This app doesn't have a backend API — everything runs on the browser saves
+to the browser's local storage.
 
 **How to run it**
 
