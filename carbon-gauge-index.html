@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Carbon Gauge — see what today cost the atmosphere</title>
+<meta name="description" content="Log daily activities, see your CO2 footprint, and track it against a weekly target." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --mist:#EEF3ED;
+  --panel:#FFFFFF;
+  --ink:#122420;
+  --ink-soft:#4E5F58;
+  --ink-faint:#8B978F;
+  --moss:#2F6F4E;
+  --moss-deep:#1F5138;
+  --amber:#C97F1E;
+  --red:#C4462F;
+  --sky:#2F6C86;
+  --track:#E1E9E1;
+  --line:#D7E2DA;
+  --shadow:0 1px 0 rgba(18,36,32,.04), 0 8px 20px rgba(18,36,32,.08);
+  --font-display:'Space Grotesk', sans-serif;
+  --font-body:'IBM Plex Sans', sans-serif;
+  --font-mono:'JetBrains Mono', monospace;
+}
+*{box-sizing:border-box;}
+body{margin:0; background:var(--mist); color:var(--ink); font-family:var(--font-body); line-height:1.5;}
+h1,h2,h3,.display{font-family:var(--font-display); font-weight:600; margin:0;}
+.wrap{max-width:1080px; margin:0 auto; padding:0 20px;}
+:focus-visible{outline:3px solid var(--sky); outline-offset:2px;}
+@media (prefers-reduced-motion: reduce){*{animation:none !important; transition:none !important;}}
+
+header.top{
+  background:var(--ink); color:#EAF1EC; border-bottom:5px solid var(--moss);
+  position:sticky; top:0; z-index:30;
+}
+.top-inner{display:flex; align-items:center; gap:24px; padding:16px 20px; flex-wrap:wrap;}
+.brand{display:flex; align-items:baseline; gap:10px; margin-right:auto;}
+.brand .logo{font-size:22px; letter-spacing:.02em;}
+.brand .dot{color:var(--moss); font-size:22px;}
+.brand .tag{font-size:12.5px; color:#9db3a9; font-family:var(--font-body);}
+nav.tabs{display:flex; gap:4px;}
+nav.tabs button{
+  background:transparent; color:#c7d6ce; border:1.5px solid #33473f; padding:8px 15px;
+  border-radius:20px; font-size:14px; font-weight:500; cursor:pointer; font-family:var(--font-body);
+}
+nav.tabs button.active{background:var(--moss); border-color:var(--moss); color:#fff;}
+nav.tabs button:hover:not(.active){border-color:#5a7269;}
+
+main{padding:32px 0 70px;}
+.page-head{margin-bottom:22px;}
+.page-head h1{font-size:30px; margin-bottom:4px;}
+.page-head p{margin:0; color:var(--ink-soft); max-width:60ch;}
+
+.panel{background:var(--panel); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow); padding:22px;}
+.grid-2{display:grid; grid-template-columns:1.1fr 1fr; gap:22px;}
+.grid-3{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:22px;}
+@media (max-width:860px){.grid-2{grid-template-columns:1fr;} .grid-3{grid-template-columns:1fr 1fr;}}
+
+/* stat chips */
+.stat{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; box-shadow:var(--shadow);}
+.stat .label{font-size:12.5px; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.05em; font-weight:600;}
+.stat .value{font-family:var(--font-mono); font-size:26px; font-weight:700; margin-top:4px;}
+.stat .sub{font-size:12.5px; color:var(--ink-soft); margin-top:2px;}
+
+/* gauge */
+.gauge-wrap{display:flex; flex-direction:column; align-items:center; gap:14px;}
+.gauge{
+  width:220px; height:220px; border-radius:50%; position:relative;
+  display:flex; align-items:center; justify-content:center;
+}
+.gauge .hole{
+  width:158px; height:158px; border-radius:50%; background:var(--panel);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+  box-shadow:inset 0 1px 4px rgba(0,0,0,.06);
+}
+.gauge .pct{font-family:var(--font-mono); font-size:30px; font-weight:700;}
+.gauge .kgs{font-size:12.5px; color:var(--ink-soft); margin-top:2px;}
+.gauge-note{
+  border-radius:8px; padding:10px 14px; font-size:14px; font-weight:500; text-align:center; max-width:360px;
+}
+.gauge-note.zone-good{background:#e6f2ea; color:var(--moss-deep);}
+.gauge-note.zone-warn{background:#faf0dd; color:#8a5a13;}
+.gauge-note.zone-over{background:#fbeae7; color:var(--red);}
+
+.days-row{display:flex; gap:8px; margin-top:6px;}
+.day-dot{
+  width:30px; height:30px; border-radius:50%; border:1.5px solid var(--line); display:flex;
+  align-items:center; justify-content:center; font-size:11px; font-weight:600; color:var(--ink-faint);
+  font-family:var(--font-mono);
+}
+.day-dot.logged{background:var(--moss); border-color:var(--moss); color:#fff;}
+.day-dot.today{outline:2px solid var(--sky); outline-offset:2px;}
+
+/* target editor */
+.target-row{display:flex; align-items:center; gap:10px; margin-top:16px; flex-wrap:wrap;}
+.target-row input{width:110px;}
+.target-row .hint{font-size:12.5px; color:var(--ink-faint);}
+
+/* breakdown bars */
+.bd-toggle{display:flex; gap:6px; margin-bottom:14px;}
+.bd-toggle button{
+  background:transparent; border:1.5px solid var(--line); border-radius:16px; padding:6px 13px;
+  font-size:13px; font-weight:600; color:var(--ink-soft); cursor:pointer; font-family:var(--font-body);
+}
+.bd-toggle button.active{background:var(--ink); border-color:var(--ink); color:#fff;}
+.bd-row{display:flex; align-items:center; gap:10px; margin-bottom:12px;}
+.bd-icon{font-size:18px; width:22px; text-align:center;}
+.bd-label{width:118px; font-size:13.5px; font-weight:500; flex-shrink:0;}
+.bd-bar-track{flex:1; height:10px; background:var(--track); border-radius:6px; overflow:hidden;}
+.bd-bar-fill{height:100%; border-radius:6px; background:var(--moss);}
+.bd-val{width:78px; text-align:right; font-family:var(--font-mono); font-size:13px; color:var(--ink-soft); flex-shrink:0;}
+
+/* forms */
+.form-row{margin-bottom:16px; display:flex; flex-direction:column; gap:6px;}
+.form-row label{font-weight:600; font-size:14px;}
+.form-row .hint{font-size:12.5px; color:var(--ink-faint);}
+.field{font-family:var(--font-body); font-size:15px; padding:10px 12px; border:1.5px solid var(--line); border-radius:6px; background:#fff; color:var(--ink);}
+.field:focus{border-color:var(--sky);}
+.type-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+.type-opt{border:1.5px solid var(--line); border-radius:8px; padding:10px 8px; text-align:center; cursor:pointer; font-size:12.5px; font-weight:600; color:var(--ink-soft);}
+.type-opt .ic{font-size:20px; display:block; margin-bottom:4px;}
+.type-opt.sel{border-color:var(--moss); background:#eef7f1; color:var(--moss-deep);}
+.btn{font-family:var(--font-body); font-weight:600; font-size:14.5px; padding:11px 20px; border-radius:7px; border:1.5px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer;}
+.btn.primary{background:var(--moss); border-color:var(--moss);}
+.btn.ghost{background:transparent; color:var(--ink); border-color:var(--line);}
+.btn.small{padding:7px 13px; font-size:13px;}
+.error-msg{color:var(--red); font-size:13px; font-weight:600;}
+
+.warn-panel{
+  border:1.5px dashed var(--amber); background:#fdf6e9; border-radius:8px; padding:14px 16px; margin-bottom:16px;
+}
+.warn-panel .head{font-weight:700; color:#8a5a13; margin-bottom:6px;}
+.warn-panel p{margin:0 0 10px; font-size:14px; color:#6b4a12;}
+.warn-actions{display:flex; gap:10px;}
+
+/* history */
+.filters{display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:18px;}
+table.hist{width:100%; border-collapse:collapse; background:var(--panel); border-radius:10px; overflow:hidden; box-shadow:var(--shadow);}
+table.hist th{background:var(--ink); color:#dce8e1; text-align:left; font-size:12.5px; text-transform:uppercase; letter-spacing:.04em; padding:10px 14px; font-weight:600;}
+table.hist td{padding:10px 14px; border-top:1px solid var(--line); font-size:14px;}
+table.hist tr:hover td{background:#f6f9f6;}
+.tag-pill{display:inline-flex; align-items:center; gap:5px; font-size:12.5px; font-weight:600; background:var(--track); padding:3px 9px; border-radius:12px;}
+.empty-state{border:2px dashed var(--line); border-radius:8px; padding:44px 24px; text-align:center; color:var(--ink-soft);}
+.empty-state .big{font-size:38px; margin-bottom:8px;}
+
+footer.site-footer{text-align:center; padding:26px 20px 50px; color:var(--ink-faint); font-size:13px;}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="brand"><span class="logo">CARBON<span class="dot">·</span>GAUGE</span><span class="tag">see what today cost the atmosphere</span></div>
+    <nav class="tabs" id="nav-tabs"></nav>
+  </div>
+</header>
+<main class="wrap" id="app"></main>
+<footer class="site-footer">Carbon Gauge — a hackathon prototype. Your log lives in this browser's local storage.</footer>
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script>
+/* =====================================================================
+   CARBON GAUGE — a personal carbon footprint tracker
+   Vanilla JS, hash-routed, localStorage-persisted single file app.
+   ===================================================================== */
+
+const FACTORS = {
+  car:        { label:"Car travel",     unit:"km",   factor:0.20, icon:"🚗", outlier:1000 },
+  bus:        { label:"Bus travel",     unit:"km",   factor:0.08, icon:"🚌", outlier:1000 },
+  flight:     { label:"Flight",         unit:"km",   factor:0.25, icon:"✈️", outlier:20000 },
+  electricity:{ label:"Electricity",    unit:"kWh",  factor:0.80, icon:"⚡", outlier:200 },
+  vegMeal:    { label:"Veg meal",       unit:"meal", factor:0.5,  icon:"🥗", outlier:10 },
+  nonVegMeal: { label:"Non-veg meal",   unit:"meal", factor:2.0,  icon:"🍖", outlier:10 },
+};
+const STORAGE_KEY = "carbon_gauge_v1";
+const EARTH_CIRCUM_KM = 40075;
+
+function uid(p){ return p+"_"+Math.random().toString(36).slice(2,9); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function round1(n){ return Math.round(n*10)/10; }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(iso){ const d=new Date(iso+"T00:00:00"); return d.toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
+
+/* ---- ISO week: Monday start ---- */
+function mondayOf(iso){
+  const d = new Date(iso+"T00:00:00");
+  const day = d.getDay(); // 0 Sun .. 6 Sat
+  const diff = day===0 ? -6 : 1-day;
+  d.setDate(d.getDate()+diff);
+  return d.toISOString().slice(0,10);
+}
+function addDays(iso,n){ const d=new Date(iso+"T00:00:00"); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+
+/* ---------------------------- state ---------------------------- */
+let state = loadState();
+function loadState(){
+  try{ const raw = localStorage.getItem(STORAGE_KEY); if (raw) return JSON.parse(raw); }
+  catch(e){ console.warn("Starting fresh — saved data unreadable.", e); }
+  return seedState();
+}
+function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+function seedState(){
+  const entries = [];
+  const today = todayStr();
+  const mon = mondayOf(today);
+  function add(type, qty, daysAgoFromMonday){
+    const date = addDays(mon, daysAgoFromMonday);
+    entries.push({ id:uid("e"), type, quantity:qty, date, kg: round1(qty*FACTORS[type].factor), createdAt: Date.now()-Math.random()*1e6 });
+  }
+  // this week so far
+  add("car", 8, 0); add("nonVegMeal", 1, 0); add("vegMeal", 1, 0);
+  add("bus", 12, 1); add("vegMeal", 2, 1);
+  add("electricity", 9, 2); add("nonVegMeal", 2, 2);
+  // last week, for history variety
+  for (let i=-7;i<0;i++){
+    if (i===-7) add("flight", 900, i);
+    if (i===-6) add("car", 15, i);
+    if (i===-5) add("vegMeal", 2, i);
+    if (i===-4) add("bus", 6, i);
+    if (i===-3) add("nonVegMeal", 1, i);
+    if (i===-2) add("electricity", 11, i);
+    if (i===-1) add("car", 4, i);
+  }
+  return { targetWeekly: 70, entries, bdMode:"week" };
+}
+
+/* ---------------------------- derived data ---------------------------- */
+function co2(type, qty){ return qty * FACTORS[type].factor; }
+function weekEntries(fromMonday){
+  const start = fromMonday, end = addDays(fromMonday,6);
+  return state.entries.filter(e => e.date>=start && e.date<=end);
+}
+function sumKg(list){ return list.reduce((s,e)=>s+e.kg,0); }
+function byCategory(list){
+  const out = {}; Object.keys(FACTORS).forEach(k=>out[k]=0);
+  list.forEach(e=>{ out[e.type]=(out[e.type]||0)+e.kg; });
+  return out;
+}
+
+/* ---------------------------- router ---------------------------- */
+const ROUTES = [ {path:"dashboard", label:"Dashboard"}, {path:"log", label:"Log Activity"}, {path:"history", label:"History"} ];
+function currentRoute(){ return (location.hash.replace(/^#\/?/,"")) || "dashboard"; }
+window.addEventListener("hashchange", render);
+window.addEventListener("DOMContentLoaded", render);
+function go(p){ location.hash = "#/"+p; }
+
+function renderNav(){
+  const nav = document.getElementById("nav-tabs");
+  const route = currentRoute();
+  nav.innerHTML = ROUTES.map(r=>`<button class="${r.path===route?'active':''}" data-r="${r.path}">${r.label}</button>`).join("");
+  nav.querySelectorAll("button").forEach(b=>b.onclick=()=>go(b.dataset.r));
+}
+
+function render(){
+  renderNav();
+  const route = currentRoute();
+  const app = document.getElementById("app");
+  if (route==="log") app.innerHTML = viewLog();
+  else if (route==="history") app.innerHTML = viewHistory();
+  else app.innerHTML = viewDashboard();
+  wireLog(); wireHistory(); wireDashboard();
+}
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+function viewDashboard(){
+  const mon = mondayOf(todayStr());
+  const wk = weekEntries(mon);
+  const weekTotal = round1(sumKg(wk));
+  const allTotal = round1(sumKg(state.entries));
+  const target = state.targetWeekly;
+  const pct = target ? Math.round((weekTotal/target)*100) : null;
+  const ringPct = target ? Math.min(pct,100) : 0;
+
+  let zoneClass="zone-good", zoneMsg="", ringColor="var(--moss)";
+  if (target){
+    if (pct >= 100){
+      zoneClass="zone-over"; ringColor="var(--red)";
+      const over = round1(weekTotal-target);
+      const cats = byCategory(wk);
+      const top = Object.entries(cats).sort((a,b)=>b[1]-a[1])[0];
+      const tip = tipFor(top ? top[0] : null);
+      zoneMsg = `You're ${over} kg over this week's ${target} kg target. ${tip}`;
+    } else if (pct >= 70){
+      zoneClass="zone-warn"; ringColor="var(--amber)";
+      const dayIdx = dayIndexOf(todayStr()); const daysLeft = 7-dayIdx;
+      zoneMsg = `You're at ${pct}% of your weekly target with ${daysLeft} day${daysLeft===1?"":"s"} left. A couple of lighter days will keep you under.`;
+    } else {
+      zoneMsg = `Nice pace — you're at ${pct}% of your weekly target so far.`;
+    }
+  } else {
+    zoneMsg = `Set a weekly target below to start tracking progress.`;
+  }
+
+  const days = ["M","T","W","T","F","S","S"];
+  const todayIdx = dayIndexOf(todayStr());
+  const dayHasLog = days.map((_,i)=> wk.some(e=>e.date===addDays(mon,i)));
+
+  return `
+  <div class="page-head"><h1>Dashboard</h1><p>Your footprint this week, and how it's tracking against your target.</p></div>
+  <div class="grid-3">
+    <div class="stat"><div class="label">This week</div><div class="value">${weekTotal} kg</div><div class="sub">CO₂e, since Monday</div></div>
+    <div class="stat"><div class="label">All-time logged</div><div class="value">${allTotal} kg</div><div class="sub">${state.entries.length} activities</div></div>
+    <div class="stat"><div class="label">Weekly target</div><div class="value">${target ? target+" kg" : "—"}</div><div class="sub">${target ? (pct+"% used") : "not set"}</div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel gauge-wrap">
+      <div class="gauge" style="background:conic-gradient(${ringColor} ${ringPct*3.6}deg, var(--track) 0deg)">
+        <div class="hole">
+          <div class="pct">${target ? pct+"%" : "--"}</div>
+          <div class="kgs">${weekTotal} / ${target ?? "?"} kg</div>
+        </div>
+      </div>
+      <div class="gauge-note ${zoneClass}">${zoneMsg}</div>
+      <div class="days-row">
+        ${days.map((d,i)=>`<div class="day-dot ${dayHasLog[i]?'logged':''} ${i===todayIdx?'today':''}" title="${addDays(mon,i)}">${d}</div>`).join("")}
+      </div>
+      <div class="target-row">
+        <label for="target-input" style="font-size:13.5px;font-weight:600;">Weekly target (kg CO₂e)</label>
+        <input class="field" id="target-input" type="number" min="1" step="1" value="${target ?? ""}" placeholder="e.g. 70">
+        <button class="btn primary small" id="save-target">Save</button>
+        <span class="hint">Week runs Monday → Sunday.</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="bd-toggle">
+        <button class="${state.bdMode==='week'?'active':''}" data-bd="week">This week</button>
+        <button class="${state.bdMode==='all'?'active':''}" data-bd="all">All time</button>
+      </div>
+      ${breakdownHtml(state.bdMode==="week" ? wk : state.entries)}
+    </div>
+  </div>
+  `;
+}
+function dayIndexOf(iso){ const d=new Date(iso+"T00:00:00"); const day=d.getDay(); return day===0?6:day-1; }
+function tipFor(cat){
+  const tips = {
+    car:"Swapping one car trip for the bus this week saves roughly 60% of that trip's CO₂.",
+    bus:"Bus travel is already your lowest-carbon transport option — nice work there.",
+    flight:"Flights are hard to offset with small swaps — combining trips helps most.",
+    electricity:"Trimming a few hours of high-draw appliance use can shave several kg off electricity's total.",
+    vegMeal:"Veg meals are already your lighter option — keep leaning on them.",
+    nonVegMeal:"Swapping one non-veg meal for veg saves about 1.5 kg each time.",
+  };
+  return cat ? (tips[cat]||"") : "";
+}
+function breakdownHtml(list){
+  const cats = byCategory(list);
+  const max = Math.max(1, ...Object.values(cats));
+  const rows = Object.entries(FACTORS).map(([key,f])=>{
+    const val = round1(cats[key]||0);
+    const w = Math.round((val/max)*100);
+    return `<div class="bd-row">
+      <span class="bd-icon">${f.icon}</span>
+      <span class="bd-label">${f.label}</span>
+      <div class="bd-bar-track"><div class="bd-bar-fill" style="width:${w}%"></div></div>
+      <span class="bd-val">${val} kg</span>
+    </div>`;
+  }).join("");
+  const total = round1(Object.values(cats).reduce((a,b)=>a+b,0));
+  return rows + `<div style="text-align:right; font-size:13px; color:var(--ink-soft); margin-top:4px;">Total: <strong>${total} kg</strong></div>`;
+}
+function wireDashboard(){
+  const t = document.getElementById("save-target");
+  if (t) t.onclick = ()=>{
+    const v = parseFloat(document.getElementById("target-input").value);
+    state.targetWeekly = (v>0) ? v : null;
+    saveState(); toast("Target saved."); render();
+  };
+  document.querySelectorAll("[data-bd]").forEach(b=>{
+    b.onclick = ()=>{ state.bdMode = b.dataset.bd; saveState(); render(); };
+  });
+}
+
+/* ============================================================
+   LOG ACTIVITY
+   ============================================================ */
+let logType = "car";
+let pendingOutlier = null; // holds a confirmed-pending entry payload
+
+function viewLog(){
+  const f = FACTORS[logType];
+  return `
+  <div class="page-head"><h1>Log an activity</h1><p>Pick a type, enter the quantity, and Carbon Gauge does the math using fixed emission factors.</p></div>
+  <div class="panel" style="max-width:560px;">
+    <div class="form-row">
+      <label>Activity type</label>
+      <div class="type-grid">
+        ${Object.entries(FACTORS).map(([key,ff])=>`
+          <div class="type-opt ${key===logType?'sel':''}" data-type="${key}">
+            <span class="ic">${ff.icon}</span>${ff.label}
+          </div>`).join("")}
+      </div>
+    </div>
+    <div class="form-row">
+      <label for="qty-input">Quantity <span class="hint">(${f.unit})</span></label>
+      <input class="field" id="qty-input" type="number" min="0" step="0.1" placeholder="e.g. 10">
+    </div>
+    <div class="form-row">
+      <label for="date-input">Date</label>
+      <input class="field" id="date-input" type="date" value="${todayStr()}" max="${todayStr()}">
+    </div>
+    <div id="warn-slot"></div>
+    <div id="log-error" class="error-msg"></div>
+    <button class="btn primary" id="log-submit">Log activity</button>
+  </div>
+  `;
+}
+function wireLog(){
+  const submit = document.getElementById("log-submit");
+  if (!submit) return;
+  document.querySelectorAll("[data-type]").forEach(el=>{
+    el.onclick = ()=>{ logType = el.dataset.type; document.getElementById("app").innerHTML = viewLog(); wireLog(); };
+  });
+  submit.onclick = ()=>{
+    const qty = parseFloat(document.getElementById("qty-input").value);
+    const date = document.getElementById("date-input").value || todayStr();
+    const err = document.getElementById("log-error");
+    if (!qty || qty<=0){ err.textContent = "Enter a quantity greater than 0."; return; }
+    err.textContent = "";
+    const f = FACTORS[logType];
+
+    if (qty > f.outlier){
+      showOutlierWarning(logType, qty, date);
+      return;
+    }
+    commitEntry(logType, qty, date);
+  };
+}
+function showOutlierWarning(type, qty, date){
+  const f = FACTORS[type];
+  let comparison = "";
+  if (type==="car" || type==="bus" || type==="flight"){
+    const laps = round1(qty/EARTH_CIRCUM_KM);
+    comparison = `That's about ${laps}× around the Earth's circumference in one entry.`;
+  } else if (type==="electricity"){
+    comparison = `That's roughly ${Math.round(qty/29)}× an average household's typical daily usage.`;
+  } else {
+    comparison = `That's ${qty} meals logged in a single entry.`;
+  }
+  document.getElementById("warn-slot").innerHTML = `
+    <div class="warn-panel">
+      <div class="head">That number looks unusually high</div>
+      <p>${qty} ${f.unit} of ${f.label.toLowerCase()} → ${round1(qty*f.factor)} kg CO₂e. ${comparison} If that's really what happened, you can log it anyway.</p>
+      <div class="warn-actions">
+        <button class="btn small" id="confirm-log">Log it anyway</button>
+        <button class="btn ghost small" id="edit-log">Let me edit it</button>
+      </div>
+    </div>`;
+  document.getElementById("confirm-log").onclick = ()=> commitEntry(type, qty, date);
+  document.getElementById("edit-log").onclick = ()=>{ document.getElementById("warn-slot").innerHTML=""; document.getElementById("qty-input").focus(); };
+}
+function commitEntry(type, qty, date){
+  const kg = round1(co2(type,qty));
+  state.entries.push({ id:uid("e"), type, quantity:qty, date, kg, createdAt:Date.now() });
+  saveState();
+  toast(`Logged ${kg} kg CO₂e.`);
+  go("dashboard");
+}
+
+/* ============================================================
+   HISTORY
+   ============================================================ */
+let histFilter = { type:"all", from:"", to:"" };
+function viewHistory(){
+  let list = [...state.entries].sort((a,b)=> b.date.localeCompare(a.date) || b.createdAt-a.createdAt);
+  if (histFilter.type!=="all") list = list.filter(e=>e.type===histFilter.type);
+  if (histFilter.from) list = list.filter(e=>e.date>=histFilter.from);
+  if (histFilter.to) list = list.filter(e=>e.date<=histFilter.to);
+  const total = round1(sumKg(list));
+
+  return `
+  <div class="page-head"><h1>History</h1><p>Every logged activity. Filter by type and date range.</p></div>
+  <div class="filters panel">
+    <select class="field" id="f-type">
+      <option value="all">All types</option>
+      ${Object.entries(FACTORS).map(([k,f])=>`<option value="${k}" ${histFilter.type===k?'selected':''}>${f.icon} ${f.label}</option>`).join("")}
+    </select>
+    <label style="font-size:13px;">From <input class="field" id="f-from" type="date" value="${histFilter.from}"></label>
+    <label style="font-size:13px;">To <input class="field" id="f-to" type="date" value="${histFilter.to}"></label>
+    <button class="btn ghost small" id="f-week">This week</button>
+    <button class="btn ghost small" id="f-clear">Clear filters</button>
+    <span class="hint" style="margin-left:auto; font-weight:600;">${list.length} entries · ${total} kg</span>
+  </div>
+  ${list.length===0 ? `<div class="empty-state"><div class="big">🗂️</div><h3>No activities match</h3><p>Try widening the date range or clearing the type filter.</p></div>` : `
+  <table class="hist">
+    <thead><tr><th>Date</th><th>Type</th><th>Quantity</th><th>CO₂e</th></tr></thead>
+    <tbody>
+      ${list.map(e=>{
+        const f = FACTORS[e.type];
+        return `<tr><td>${fmtDate(e.date)}</td><td><span class="tag-pill">${f.icon} ${f.label}</span></td><td>${e.quantity} ${f.unit}</td><td><strong>${e.kg} kg</strong></td></tr>`;
+      }).join("")}
+    </tbody>
+  </table>`}
+  `;
+}
+function wireHistory(){
+  const ft = document.getElementById("f-type");
+  if (!ft) return;
+  ft.onchange = e=>{ histFilter.type = e.target.value; render(); };
+  document.getElementById("f-from").onchange = e=>{ histFilter.from = e.target.value; render(); };
+  document.getElementById("f-to").onchange = e=>{ histFilter.to = e.target.value; render(); };
+  document.getElementById("f-week").onclick = ()=>{
+    const mon = mondayOf(todayStr());
+    histFilter = { type: histFilter.type, from: mon, to: addDays(mon,6) };
+    render();
+  };
+  document.getElementById("f-clear").onclick = ()=>{ histFilter = {type:"all", from:"", to:""}; render(); };
+}
+
+/* ---------------------------- toast ---------------------------- */
+function toast(msg){
+  const root = document.getElementById("toast-root");
+  root.innerHTML = `<div style="position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#EAF1EC;padding:11px 20px;border-radius:7px;font-size:14px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.3);">${escapeHtml(msg)}</div>`;
+  setTimeout(()=>{ root.innerHTML=""; }, 2600);
+}
+</script>
+</body>
+</html>
