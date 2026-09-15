@@ -14,5 +14,5 @@ Just HTML, CSS, and JavaScript — no frameworks, no build tools. It saves every
 
 **How to run it**
 
-Download index.html and open it in your browser.No installs needed.
+Download carbon-gauge-index.html and open it in your browser.No installs needed.
 
